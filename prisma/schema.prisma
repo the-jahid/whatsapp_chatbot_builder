@@ -48,6 +48,7 @@ model Agent {
   @@index([userId, isActive])
 }
 
+
 model Whatsapp {
   id           String   @id @default(uuid())
   whatsappJid  String?
@@ -58,6 +59,7 @@ model Whatsapp {
   agentId      String   @unique
   agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
 }
+
 
 model KnowledgeBase {
   id                 String                  @id @default(uuid())
