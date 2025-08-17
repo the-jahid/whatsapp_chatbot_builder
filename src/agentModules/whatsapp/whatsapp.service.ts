@@ -70,6 +70,17 @@ export class WhatsappService implements OnModuleInit {
     }
   }
 
+  async sendText(agentId: string, jid: string, text: string): Promise<{ id: string }> {
+  const conn = (this as any).connections?.get(agentId);
+  const sock = conn?.socket;
+  if (!sock) throw new NotFoundException('WhatsApp is not connected for this agent');
+
+  const res = await sock.sendMessage(jid, { text });
+  // Baileys returns an object with key/id; normalize to { id }
+  const id = (res as any)?.key?.id ?? '';
+  return { id };
+}
+
   async start(agentId: string): Promise<{ qr?: string; status: string; message: string }> {
     const existingConnection = this.connections.get(agentId);
     if (existingConnection && existingConnection.status !== 'close') {

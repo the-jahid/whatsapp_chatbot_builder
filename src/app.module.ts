@@ -13,6 +13,9 @@ import { GoogleAuthModule } from './auth/google-auth/google-auth.module';
 import { CalendarConnectionModule } from './CalendarConnection/calendar-connection.module';
 import { BookingSettingsModule } from './agentModules/booking-settings/booking-settings.module';
 import { AppointmentLeadItemModule } from './agentModules/appointment-lead-item/appointment-lead-item.module';
+import { OutboundCampaignModule } from './agentModules/outbound/outbound-campaign/outbound-campaign.module';
+import { LeadCustomFieldIntakeModule } from './agentModules/outbound/lead-custom-field-intake/lead-custom-field-intake.module';
+import { OutboundLeadModule } from './agentModules/outbound/outbound-lead/outbound-lead.module';
 
 
 @Module({
@@ -30,7 +33,10 @@ import { AppointmentLeadItemModule } from './agentModules/appointment-lead-item/
      GoogleAuthModule,
      CalendarConnectionModule,
      BookingSettingsModule,
-     AppointmentLeadItemModule
+     AppointmentLeadItemModule,
+     OutboundCampaignModule,
+     LeadCustomFieldIntakeModule, 
+     OutboundLeadModule
     ],
   providers: [AuthGuard]
 })

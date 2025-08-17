@@ -72,6 +72,32 @@ enum AppointmentStatus {
   COMPLETED
 }
 
+
+enum OutboundCampaignType {
+  SINGLE
+  BROADCAST
+}
+
+enum OutboundCampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+enum OutboundLeadStatus {
+  QUEUED
+  NEED_RETRY
+  MESSAGE_SUCCESSFUL
+  COMPLETED
+  FAILED
+  INVALID_NUMBER
+  BLOCKED
+  UNSUBSCRIBED
+  DNC                // Do Not Contact
+}
+
 // ===================================
 //  MODELS
 // ===================================
@@ -127,6 +153,8 @@ model Agent {
   // Appointment intake configuration (simple, LeadItem-like)
   appointmentLeadItems  AppointmentLeadItem[]
 
+  outboundCampaigns OutboundCampaign[]   // ← new
+
   @@index([userId, isActive])
 }
 
@@ -146,6 +174,90 @@ model Whatsapp {
   agentId String @unique
   agent   Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
 }
+
+
+model OutboundCampaign {
+  id                   String                   @id @default(uuid())
+  name                 String
+  type                 OutboundCampaignType     @default(SINGLE)
+  status               OutboundCampaignStatus   @default(DRAFT)
+  agentEnabled         Boolean                  @default(true)
+  scheduledAt          DateTime?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  cancelledAt          DateTime?
+  agentId              String
+  agent                Agent                    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  // ↴ One OutboundCampaign → Many leadCustomFieldInatake
+  leadCustomFieldIntakes leadCustomFieldInatake[]
+
+  // ↴ One OutboundCampaign → Many OutboundLead
+  outboundLeads        OutboundLead[]
+
+  totalMessages        Int                      @default(0)
+  leadsCount           Int                      @default(0)
+  answeredLeadsCount   Int                      @default(0)
+  lastActivityAt       DateTime?
+  config               Json?
+  stats                Json?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  @@map("outboundCampaigns")
+  @@index([agentId, agentEnabled, status, scheduledAt, lastActivityAt])
+  @@index([createdAt])
+}
+
+model leadCustomFieldInatake {
+  id                  String            @id @default(uuid())
+  name                String            // machine key, e.g. "referenceId"
+
+  // ↴ Belongs to one OutboundCampaign
+  outboundCampaignId  String
+  outboundCampaign    OutboundCampaign  @relation(fields: [outboundCampaignId], references: [id], onDelete: Cascade)
+
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@map("lead_custom_field_inatake")
+  @@index([outboundCampaignId])
+  @@unique([outboundCampaignId, name])  // unique per campaign
+}
+
+model OutboundLead {
+  id               String             @id @default(uuid())
+  phoneNumber      String
+  firstName        String?
+  timeZone         String             @default("UTC") // e.g., "W. Europe Standard Time" or IANA
+  status           OutboundLeadStatus @default(QUEUED)
+
+  // Attempts (to render "3/3" etc.)
+  attemptsMade     Int                @default(0)
+  maxAttempts      Int                @default(3)
+  lastAttemptAt    DateTime?
+
+  // 🔗 Belongs to one OutboundCampaign
+  outboundCampaignId String
+  outboundCampaign    OutboundCampaign @relation(fields: [outboundCampaignId], references: [id], onDelete: Cascade)
+
+  // Dynamic, user-defined fields (free-form JSON)
+  customFields     Json?              @db.JsonB
+
+
+
+  // Bookkeeping
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@map("outbound_leads")
+  @@index([createdAt])
+  @@index([status])
+  @@index([phoneNumber])
+  @@index([outboundCampaignId, status, createdAt])
+}
+
+// ---------------------------------------------------Outbound_section_ends -----------------
 
 /// Contains the custom knowledge for an agent to draw upon.
 model KnowledgeBase {
