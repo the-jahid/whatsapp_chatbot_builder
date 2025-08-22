@@ -7,226 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                  String               @id @default(uuid())
-  email               String               @unique
-  oauthId             String               @unique
-  username            String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  agents              Agent[]
-  calendarConnections CalendarConnection[]
-}
-
-model Agent {
-  id                    String                    @id @default(uuid())
-  name                  String
-  prompt                String?
-  apiKey                String?                   @unique
-  isActive              Boolean                   @default(false)
-  isLeadsActive         Boolean                   @default(false)
-  isEmailActive         Boolean                   @default(false)
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-  userId                String
-  memoryType            MemoryType                @default(BUFFER)
-  isKnowledgebaseActive Boolean                   @default(false)
-  isBookingActive       Boolean                   @default(false)
-  user                  User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  calendarAssignments   AgentCalendarAssignment[]
-  appointments          Appointment[]
-  appointmentLeadItems  AppointmentLeadItem[]
-  bookingSettings       BookingSettings?
-  conversations         Conversation[]
-  Email                 Email[]
-  knowledgeBase         KnowledgeBase?
-  leads                 Lead[]
-  leadItems             LeadItem[]
-  weeklyAvailabilities  WeeklyAvailability[]
-  whatsapp              Whatsapp?
-
-  @@index([userId, isActive])
-}
-
-
-model Whatsapp {
-  id           String   @id @default(uuid())
-  whatsappJid  String?
-  whatsappName String?
-  sessionData  Json
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  agentId      String   @unique
-  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
-}
-
-
-model KnowledgeBase {
-  id                 String                  @id @default(uuid())
-  freeText           String?
-  companyName        String?
-  companyDescription String?
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  agentId            String                  @unique
-  agent              Agent                   @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  documents          KnowledgeBaseDocument[]
-}
-
-model KnowledgeBaseDocument {
-  id              String        @id @default(uuid())
-  title           String
-  content         String
-  tags            String[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  knowledgeBaseId String
-  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
-
-  @@index([knowledgeBaseId, createdAt])
-}
-
-model BookingSettings {
-  id                  String   @id @default(uuid())
-  appointmentSlot     Int      @default(15)
-  allowSameDayBooking Boolean  @default(true)
-  enableNotifications Boolean  @default(true)
-  notificationEmails  String[]
-  agentId             String   @unique
-  timezone            String   @default("UTC")
-  agent               Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
-}
-
-model CalendarConnection {
-  id                   String                    @id @default(uuid())
-  provider             CalendarProvider
-  accountEmail         String
-  refreshToken         String?
-  isPrimary            Boolean                   @default(false)
-  createdAt            DateTime                  @default(now())
-  updatedAt            DateTime                  @updatedAt
-  accessToken          String?
-  accessTokenExpiresAt DateTime?
-  calendarId           String?
-  userId               String
-  agentAssignments     AgentCalendarAssignment[]
-  user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, accountEmail])
-  @@index([userId, isPrimary])
-}
-
-model AgentCalendarAssignment {
-  agentId              String
-  calendarConnectionId String
-  assignedAt           DateTime           @default(now())
-  agent                Agent              @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  calendarConnection   CalendarConnection @relation(fields: [calendarConnectionId], references: [id], onDelete: Cascade)
-
-  @@id([agentId, calendarConnectionId])
-}
-
-model WeeklyAvailability {
-  id        String    @id @default(uuid())
-  dayOfWeek DayOfWeek
-  startTime String
-  endTime   String
-  agentId   String
-  agent     Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  
-
-  @@unique([agentId, dayOfWeek, startTime, endTime])
-}
-
-model Appointment {
-  id        String            @id @default(uuid())
-  startTime DateTime
-  endTime   DateTime
-  status    AppointmentStatus @default(PENDING)
-  location  String?
-  notes     String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  agentId   String
-  timezone  String            @default("UTC")
-  agent     Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@index([agentId, startTime])
-}
-
-model AppointmentLeadItem {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  agentId     String
-  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@unique([agentId, name])
-  @@index([agentId, createdAt])
-}
-
-model LeadItem {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  agentId     String
-  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@unique([agentId, name])
-}
-
-model Lead {
-  id                 String              @id @default(uuid())
-  status             LeadStatus          @default(NEW)
-  source             String?
-  data               Json
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  agentId            String
-
-  agent              Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@index([agentId, status, createdAt])
-}
-
-model Conversation {
-  id         String     @id @default(uuid())
-  senderJid  String
-  message    String
-  senderType SenderType
-  createdAt  DateTime   @default(now())
-  agentId    String
-  metadata   Json?
-  agent      Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@index([agentId, senderJid, createdAt])
-}
-
-model Email {
-  id                String      @id @default(uuid())
-  recipient         String
-  subject           String
-  body              String
-  sentAt            DateTime    @default(now())
-  agentId           String
-  status            EmailStatus @default(SENT)
-  clickedAt         DateTime?
-  lastError         String?
-  openedAt          DateTime?
-  providerMessageId String?
-  agent             Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@index([agentId, sentAt])
-  @@index([status])
-}
-
-
-
-
+/**
+ * ================================
+ * ENUMS
+ * ================================
+ */
 
 enum LeadStatus {
   NEW
@@ -291,6 +76,28 @@ enum OutboundCampaignStatus {
   CANCELLED
 }
 
+/**
+ * SUPERTSET to avoid data loss. Keep old values to let `db push` succeed.
+ * (Optional cleanup: remap data and later remove deprecated values.)
+ */
+enum OutboundLeadStatus {
+  // New/kept
+  QUEUED
+  IN_PROGRESS
+  ANSWERED
+  COMPLETED
+  FAILED
+  PAUSED
+
+  // Deprecated (still present in DB)
+  NEED_RETRY
+  MESSAGE_SUCCESSFUL
+  INVALID_NUMBER
+  BLOCKED
+  UNSUBSCRIBED
+  DNC
+}
+
 enum OutboundMessageStatus {
   QUEUED
   SENT
@@ -311,9 +118,324 @@ enum OutboundMessageEventType {
   CANCELLED
 }
 
-/// Per-recipient progression status inside a campaign sequence
 enum RecipientProgressStatus {
   ACTIVE
   COMPLETED
   STOPPED
+}
+
+/**
+ * ================================
+ * MODELS
+ * ================================
+ */
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  oauthId   String   @unique
+  username  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agents              Agent[]
+  calendarConnections CalendarConnection[]
+}
+
+model Agent {
+  id                    String     @id @default(uuid())
+  name                  String
+  prompt                String?
+  apiKey                String?    @unique
+  isActive              Boolean    @default(false)
+  isLeadsActive         Boolean    @default(false)
+  isEmailActive         Boolean    @default(false)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  userId                String
+  memoryType            MemoryType @default(BUFFER)
+  isKnowledgebaseActive Boolean    @default(false)
+  isBookingActive       Boolean    @default(false)
+
+  user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calendarAssignments  AgentCalendarAssignment[]
+  appointments         Appointment[]
+  appointmentLeadItems AppointmentLeadItem[]
+  bookingSettings      BookingSettings?
+  conversations        Conversation[]
+  Email                Email[]
+  knowledgeBase        KnowledgeBase?
+  leads                Lead[]
+  leadItems            LeadItem[]
+  weeklyAvailabilities WeeklyAvailability[]
+
+  // Opposite side of 1–1 Whatsapp relation
+  whatsapp         Whatsapp?
+  OutboundCampaign OutboundCampaign[]
+
+  @@index([userId, isActive])
+}
+
+model Whatsapp {
+  id           String   @id @default(uuid())
+  whatsappJid  String?
+  whatsappName String?
+  sessionData  Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  agentId      String   @unique
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+model OutboundCampaign {
+  id           String                 @id @default(uuid())
+  name         String
+  type         OutboundCampaignType   @default(SINGLE)
+  status       OutboundCampaignStatus @default(DRAFT)
+  agentEnabled Boolean                @default(true)
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  agentId      String
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  // One OutboundCampaign → Many leadCustomFieldInatake
+  leadCustomFieldIntakes leadCustomFieldInatake[]
+
+  // One OutboundCampaign → Many OutboundLead
+  outboundLeads OutboundLead[]
+
+  totalMessages      Int       @default(0)
+  leadsCount         Int       @default(0)
+  answeredLeadsCount Int       @default(0)
+  lastActivityAt     DateTime?
+  config             Json?
+  stats              Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([agentId, agentEnabled, status, scheduledAt, lastActivityAt])
+  @@index([createdAt])
+  @@map("outboundCampaigns")
+}
+
+model leadCustomFieldInatake {
+  id   String @id @default(uuid())
+  name String
+
+  outboundCampaignId String
+  outboundCampaign   OutboundCampaign @relation(fields: [outboundCampaignId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([outboundCampaignId, name])
+  @@index([outboundCampaignId])
+  @@map("lead_custom_field_inatake")
+}
+
+model OutboundLead {
+  id          String             @id @default(uuid())
+  phoneNumber String
+  firstName   String?
+  timeZone    String             @default("UTC")
+  status      OutboundLeadStatus @default(QUEUED)
+
+  // Attempts
+  attemptsMade  Int       @default(0)
+  maxAttempts   Int       @default(3)
+  lastAttemptAt DateTime?
+
+  // Belongs to one OutboundCampaign
+  outboundCampaignId String
+  outboundCampaign   OutboundCampaign @relation(fields: [outboundCampaignId], references: [id], onDelete: Cascade)
+
+  // Dynamic fields
+  customFields Json?
+
+  // Bookkeeping
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([phoneNumber])
+  @@index([outboundCampaignId, status, createdAt])
+  @@map("outbound_leads")
+}
+
+model KnowledgeBase {
+  id                 String   @id @default(uuid())
+  freeText           String?
+  companyName        String?
+  companyDescription String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  agentId            String   @unique
+
+  agent     Agent                   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  documents KnowledgeBaseDocument[]
+}
+
+model KnowledgeBaseDocument {
+  id              String   @id @default(uuid())
+  title           String
+  content         String
+  tags            String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  knowledgeBaseId String
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId, createdAt])
+}
+
+model BookingSettings {
+  id                  String   @id @default(uuid())
+  appointmentSlot     Int      @default(15)
+  allowSameDayBooking Boolean  @default(true)
+  enableNotifications Boolean  @default(true)
+  notificationEmails  String[]
+  agentId             String   @unique
+  timezone            String   @default("UTC")
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+model CalendarConnection {
+  id                   String           @id @default(uuid())
+  provider             CalendarProvider
+  accountEmail         String
+  refreshToken         String?
+  isPrimary            Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  accessToken          String?
+  accessTokenExpiresAt DateTime?
+  calendarId           String?
+  userId               String
+
+  agentAssignments AgentCalendarAssignment[]
+  user             User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, accountEmail])
+  @@index([userId, isPrimary])
+}
+
+model AgentCalendarAssignment {
+  agentId              String
+  calendarConnectionId String
+  assignedAt           DateTime @default(now())
+
+  agent              Agent              @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  calendarConnection CalendarConnection @relation(fields: [calendarConnectionId], references: [id], onDelete: Cascade)
+
+  @@id([agentId, calendarConnectionId])
+}
+
+model WeeklyAvailability {
+  id        String    @id @default(uuid())
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime   String
+  agentId   String
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, dayOfWeek, startTime, endTime])
+}
+
+model Appointment {
+  id        String            @id @default(uuid())
+  startTime DateTime
+  endTime   DateTime
+  status    AppointmentStatus @default(PENDING)
+  location  String?
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  agentId   String
+  timezone  String            @default("UTC")
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, startTime])
+}
+
+model AppointmentLeadItem {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  agentId     String
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, name])
+  @@index([agentId, createdAt])
+}
+
+model LeadItem {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  agentId     String
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, name])
+}
+
+model Lead {
+  id        String     @id @default(uuid())
+  status    LeadStatus @default(NEW)
+  source    String?
+  data      Json
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  agentId   String
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, status, createdAt])
+}
+
+model Conversation {
+  id         String     @id @default(uuid())
+  senderJid  String
+  message    String
+  senderType SenderType
+  createdAt  DateTime   @default(now())
+  agentId    String
+  metadata   Json?
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, senderJid, createdAt])
+}
+
+model Email {
+  id                String      @id @default(uuid())
+  recipient         String
+  subject           String
+  body              String
+  sentAt            DateTime    @default(now())
+  agentId           String
+  status            EmailStatus @default(SENT)
+  clickedAt         DateTime?
+  lastError         String?
+  openedAt          DateTime?
+  providerMessageId String?
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, sentAt])
+  @@index([status])
 }
