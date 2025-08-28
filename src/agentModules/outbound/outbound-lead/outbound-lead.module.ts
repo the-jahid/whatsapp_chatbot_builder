@@ -11,7 +11,7 @@ import { LeadCustomFieldIntakeModule } from '../lead-custom-field-intake/lead-cu
     LeadCustomFieldIntakeModule,   // 👈 provides LeadCustomFieldIntakeService
   ],
   controllers: [OutboundLeadController], // or []
-  providers: [PrismaService, OutboundLeadRepository, OutboundLeadService],
+  providers: [ OutboundLeadRepository, OutboundLeadService],
   exports: [
     OutboundLeadRepository,        // so other modules (campaign) can use it
     OutboundLeadService,           // optional

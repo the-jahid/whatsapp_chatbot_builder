@@ -18,6 +18,9 @@ export interface IOutboundCampaign {
   // ownership
   agentId: string;
 
+  // template assignment (nullable)
+  assignedTemplate: string | null;
+
   // dashboard counters
   totalMessages: number;
   leadsCount: number;
@@ -25,8 +28,8 @@ export interface IOutboundCampaign {
   lastActivityAt: Date | null;
 
   // flexible blobs
-  config?: Prisma.JsonValue | null;
-  stats?: Prisma.JsonValue | null;
+  config: Prisma.JsonValue | null;
+  stats: Prisma.JsonValue | null;
 
   // bookkeeping
   createdAt: Date;

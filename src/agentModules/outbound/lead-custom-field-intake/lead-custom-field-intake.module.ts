@@ -8,7 +8,7 @@ import { LeadCustomFieldIntakeController } from './lead-custom-field-intake.cont
 @Module({
   imports: [],
   controllers: [LeadCustomFieldIntakeController], // or []
-  providers: [PrismaService, LeadCustomFieldIntakeRepository, LeadCustomFieldIntakeService],
+  providers: [ LeadCustomFieldIntakeRepository, LeadCustomFieldIntakeService],
   exports: [
     LeadCustomFieldIntakeService,          // 👈 make it available to other modules
     LeadCustomFieldIntakeRepository,       // (optional) export repo too

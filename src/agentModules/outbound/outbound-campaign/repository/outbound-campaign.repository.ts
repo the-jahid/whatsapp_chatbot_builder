@@ -49,6 +49,7 @@ export class OutboundCampaignRepository {
         status: dto.status ?? OutboundCampaignStatus.DRAFT,
         agentEnabled: dto.agentEnabled ?? true,
         scheduledAt: dto.scheduledAt ?? null,
+        // columns are nullable JSONB in schema; omit when not provided
         config: dto.config ?? undefined,
         stats: dto.stats ?? undefined,
       },
@@ -68,11 +69,10 @@ export class OutboundCampaignRepository {
         : Prisma.OutboundCampaignGetPayload<{ select: T }>)
     | null
   > {
-    return (this.prisma.outboundCampaign.findUnique({
-      where: { id },
-   
-      select,
-    }) as unknown) as Promise<
+    const args: Prisma.OutboundCampaignFindUniqueArgs = { where: { id } };
+    if (select) (args as any).select = select;
+
+    return this.prisma.outboundCampaign.findUnique(args) as unknown as Promise<
       | (T extends undefined
           ? IOutboundCampaign
           : Prisma.OutboundCampaignGetPayload<{ select: T }>)
@@ -171,6 +171,28 @@ export class OutboundCampaignRepository {
   }
 
   // ------------------------------------------------------------------
+  // Assigned template helpers (optional but handy)
+  // ------------------------------------------------------------------
+
+  async setAssignedTemplate(
+    id: string,
+    templateId: string | null,
+  ): Promise<IOutboundCampaign> {
+    return this.prisma.outboundCampaign.update({
+      where: { id },
+      data: { assignedTemplate: templateId },
+    });
+  }
+
+  async getAssignedTemplate(id: string): Promise<string | null> {
+    const row = await this.prisma.outboundCampaign.findUnique({
+      where: { id },
+      select: { assignedTemplate: true },
+    });
+    return row?.assignedTemplate ?? null;
+  }
+
+  // ------------------------------------------------------------------
   // Query / List
   // ------------------------------------------------------------------
 
@@ -230,30 +252,34 @@ export class OutboundCampaignRepository {
     // date ranges
     if (query.scheduledFrom || query.scheduledTo) {
       where.scheduledAt = {};
-      if (query.scheduledFrom)
+      if (query.scheduledFrom) {
         (where.scheduledAt as Prisma.DateTimeFilter).gte = new Date(
-          query.scheduledFrom,
+          query.scheduledFrom as any,
         );
-      if (query.scheduledTo)
+      }
+      if (query.scheduledTo) {
         (where.scheduledAt as Prisma.DateTimeFilter).lte = new Date(
-          query.scheduledTo,
+          query.scheduledTo as any,
         );
+      }
     }
 
     if (query.createdFrom || query.createdTo) {
       where.createdAt = {};
-      if (query.createdFrom)
+      if (query.createdFrom) {
         (where.createdAt as Prisma.DateTimeFilter).gte = new Date(
-          query.createdFrom,
+          query.createdFrom as any,
         );
-      if (query.createdTo)
+      }
+      if (query.createdTo) {
         (where.createdAt as Prisma.DateTimeFilter).lte = new Date(
-          query.createdTo,
+          query.createdTo as any,
         );
+      }
     }
 
     return where;
-    }
+  }
 
   private buildOrderBy(
     sortBy?: OutboundCampaignSortBy,

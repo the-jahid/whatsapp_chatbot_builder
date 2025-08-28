@@ -10,23 +10,26 @@ export type OutboundCampaignSortBy =
 export type SortOrder = 'asc' | 'desc';
 
 /**
- * Mirrors QueryOutboundCampaignsSchema (IDs are strings; UUID version is not enforced here).
+ * Normalized query shape AFTER Zod validation (QueryOutboundCampaignsSchema).
+ * - Defaults applied: page, limit, sortBy, sortOrder
+ * - Dates coerced to Date
+ * - status normalized to an array
  */
 export interface IOutboundCampaignQuery {
-  page?: number;          // default 1
-  limit?: number;         // default 20 (max 100)
+  page: number;                        // defaulted by schema (1)
+  limit: number;                       // defaulted by schema (20)
 
   agentId?: string;
   type?: OutboundCampaignType;
-  status?: OutboundCampaignStatus | OutboundCampaignStatus[];
+  status?: OutboundCampaignStatus[];   // normalized (single -> array)
 
-  q?: string;             // search by name
+  q?: string;                          // empty trimmed to undefined by schema
 
-  scheduledFrom?: Date | string;
-  scheduledTo?: Date | string;
-  createdFrom?: Date | string;
-  createdTo?: Date | string;
+  scheduledFrom?: Date;
+  scheduledTo?: Date;
+  createdFrom?: Date;
+  createdTo?: Date;
 
-  sortBy?: OutboundCampaignSortBy;  // default 'createdAt'
-  sortOrder?: SortOrder;            // default 'desc'
+  sortBy: OutboundCampaignSortBy;      // defaulted by schema ('createdAt')
+  sortOrder: SortOrder;                // defaulted by schema ('desc')
 }

@@ -5,6 +5,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Injectable,
   Param,
   Patch,
@@ -17,7 +18,7 @@ import { OutboundLeadStatus } from '@prisma/client';
 
 import { OutboundCampaignService } from './outbound-campaign.service';
 
-// DTO types
+// DTOs
 import { CreateOutboundCampaignDto } from './dto/create-outbound-campaign.dto';
 import { UpdateOutboundCampaignDto } from './dto/update-outbound-campaign.dto';
 import { ScheduleOutboundCampaignDto } from './dto/schedule-outbound-campaign.dto';
@@ -26,21 +27,19 @@ import { SetStatusDto } from './dto/set-status.dto';
 import { QueryOutboundCampaignsDto } from './dto/query-outbound-campaigns.dto';
 import { RecordActivityDto } from './dto/record-activity.dto';
 
-// Zod schemas (runtime validation)
+// Zod Schemas (runtime validation)
 import {
   CreateOutboundCampaignSchema,
   UpdateOutboundCampaignSchema,
   ScheduleOutboundCampaignSchema,
   ToggleAgentSchema,
   SetStatusSchema,
+  AssignTemplateSchema, // (templateId?: UUID | null, requireActive?: boolean)
 } from './schema/outbound-campaign.schema';
 import { QueryOutboundCampaignsSchema } from './schema/query-outbound-campaigns.schema';
 import { RecordActivitySchema } from './schema/record-activity.schema';
 
-/**
- * Pipe that allows ANY UUID version (3/4/5/7), trims whitespace.
- * Swap to Nest's ParseUUIDPipe({ version: '4' }) if you want v4-only later.
- */
+/** Accept ANY UUID version; trims input before checking */
 @Injectable()
 class AnyUuidPipe implements PipeTransform<string> {
   private readonly re =
@@ -62,19 +61,65 @@ const SendToLeadSchema = z.object({
 type SendToLeadInput = z.infer<typeof SendToLeadSchema>;
 
 const LeadStatusOneOrMany = z
-  .union([
-    z.nativeEnum(OutboundLeadStatus),
-    z.array(z.nativeEnum(OutboundLeadStatus)).nonempty(),
-  ])
+  .union([z.nativeEnum(OutboundLeadStatus), z.array(z.nativeEnum(OutboundLeadStatus)).nonempty()])
   .optional();
 
 const BroadcastSchema = z.object({
   text: z.string().trim().min(1, 'text is required'),
-  filterStatus: LeadStatusOneOrMany,              // default handled in service
+  filterStatus: LeadStatusOneOrMany, // defaults handled in service
   limit: z.coerce.number().int().min(1).max(5000).optional(),
   throttleMs: z.coerce.number().int().min(0).max(60000).optional(),
 });
 type BroadcastInput = z.infer<typeof BroadcastSchema>;
+
+/**
+ * Schedule-broadcast body (inline schema)
+ * One of `startAt` (ISO datetime) or `startIn` (e.g., "5m", "2h", "1d", "30s") is required.
+ * If `useAssignedTemplate = true`, we ignore `templateId` and use the campaign's assigned template.
+ */
+const UUID_RE =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+const ScheduleBroadcastSchema = z
+  .object({
+    // when
+    startAt: z.coerce.date().optional(),
+    startIn: z
+      .string()
+      .trim()
+      .regex(/^\d+\s*[smhd]$/i, 'Use formats like "30s", "5m", "2h", or "1d"')
+      .optional(),
+
+    // template selection
+    useAssignedTemplate: z.boolean().default(true).optional(),
+    templateId: z.string().trim().regex(UUID_RE, 'templateId must be a UUID').optional(),
+
+    // selection & caps
+    filterStatus: z.array(z.nativeEnum(OutboundLeadStatus)).nonempty().optional(), // defaults to only QUEUED in service
+    limit: z.coerce.number().int().min(1).max(100000).optional(),
+
+    // batching (anti-ban)
+    batch: z
+      .object({
+        size: z.coerce.number().int().min(1).max(1000).optional(),
+        intervalMs: z.coerce.number().int().min(0).max(60000).optional(),
+      })
+      .optional(),
+
+    // New fields for pacing
+    duration: z.string().optional(), // e.g., "10m", "24h", "2d"
+  })
+  .refine((d) => !!d.startAt || !!d.startIn, {
+    message: 'Provide either startAt or startIn',
+    path: ['startAt'],
+  })
+  .refine((d) => !(d.startAt && d.startIn), {
+    message: 'Provide only one of startAt or startIn',
+    path: ['startAt'],
+  });
+type ScheduleBroadcastInput = z.infer<typeof ScheduleBroadcastSchema>;
+
+type AssignTemplateInput = z.infer<typeof AssignTemplateSchema>;
 
 @Controller()
 export class OutboundCampaignController {
@@ -94,7 +139,7 @@ export class OutboundCampaignController {
   @Post('agents/:agentId/outbound-campaigns')
   async createForAgent(
     @Param('agentId', new AnyUuidPipe()) agentId: string,
-    @Body() body: CreateOutboundCampaignDto, // no agentId in body
+    @Body() body: CreateOutboundCampaignDto,
   ) {
     const dto = this.validate(CreateOutboundCampaignSchema, body);
     return this.svc.create(agentId, dto);
@@ -133,8 +178,9 @@ export class OutboundCampaignController {
 
   // DELETE /outbound-campaigns/:id
   @Delete('outbound-campaigns/:id')
-  async remove(@Param('id', new AnyUuidPipe()) id: string) {
-    return this.svc.remove(id);
+  @HttpCode(204)
+  async remove(@Param('id', new AnyUuidPipe()) id: string): Promise<void> {
+    await this.svc.remove(id);
   }
 
   // ---------------------------------------------------------------------------
@@ -182,7 +228,36 @@ export class OutboundCampaignController {
   }
 
   // ---------------------------------------------------------------------------
-  // NEW: WhatsApp send endpoints
+  // Assign / Read assigned template
+  // ---------------------------------------------------------------------------
+
+  // PATCH /agents/:agentId/outbound-campaigns/:campaignId/assigned-template
+  @Patch('agents/:agentId/outbound-campaigns/:campaignId/assigned-template')
+  async setAssignedTemplate(
+    @Param('agentId', new AnyUuidPipe()) agentId: string,
+    @Param('campaignId', new AnyUuidPipe()) campaignId: string,
+    @Body() body: AssignTemplateInput,
+  ) {
+    const dto = this.validate(AssignTemplateSchema, body);
+    return this.svc.setAssignedTemplate({
+      agentId,
+      campaignId,
+      templateId: dto.templateId ?? null, // null clears the assignment
+      requireActive: dto.requireActive ?? true,
+    });
+  }
+
+  // GET /agents/:agentId/outbound-campaigns/:campaignId/assigned-template
+  @Get('agents/:agentId/outbound-campaigns/:campaignId/assigned-template')
+  async getAssignedTemplate(
+    @Param('agentId', new AnyUuidPipe()) _agentId: string, // ownership can be enforced via guard or service
+    @Param('campaignId', new AnyUuidPipe()) campaignId: string,
+  ) {
+    return this.svc.getAssignedTemplate(campaignId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // WhatsApp send endpoints (manual)
   // ---------------------------------------------------------------------------
 
   // POST /agents/:agentId/outbound-campaigns/:campaignId/send/lead/:leadId
@@ -206,7 +281,7 @@ export class OutboundCampaignController {
   ) {
     const dto = this.validate(BroadcastSchema, body);
 
-    // normalize single status into array for service
+    // normalize single status → array
     const filterStatus = Array.isArray(dto.filterStatus)
       ? dto.filterStatus
       : dto.filterStatus
@@ -220,6 +295,38 @@ export class OutboundCampaignController {
       filterStatus,
       limit: dto.limit,
       throttleMs: dto.throttleMs,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Schedule broadcast (deferred, batched auto-send)
+  // ---------------------------------------------------------------------------
+
+  // POST /agents/:agentId/outbound-campaigns/:campaignId/broadcast/schedule
+  @Post('agents/:agentId/outbound-campaigns/:campaignId/broadcast/schedule')
+  @HttpCode(202) // Accepted: scheduled for future execution
+  async scheduleBroadcast(
+    @Param('agentId', new AnyUuidPipe()) agentId: string,
+    @Param('campaignId', new AnyUuidPipe()) campaignId: string,
+    @Body() body: ScheduleBroadcastInput,
+  ) {
+    const dto = this.validate(ScheduleBroadcastSchema, body);
+
+    // If the caller says to use assignedTemplate, ignore templateId.
+    const settings = {
+      templateId: dto.useAssignedTemplate ? null : dto.templateId ?? null,
+      filterStatus: dto.filterStatus,
+      limit: dto.limit,
+      batch: dto.batch,
+      duration: dto.duration, // Added duration field
+    };
+
+    return this.svc.scheduleBroadcast({
+      agentId,
+      campaignId,
+      startAt: dto.startAt,
+      startIn: dto.startIn,
+      settings,
     });
   }
 }

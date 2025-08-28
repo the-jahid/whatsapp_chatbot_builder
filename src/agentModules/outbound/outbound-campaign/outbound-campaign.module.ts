@@ -8,14 +8,16 @@ import { OutboundCampaignRepository } from './repository/outbound-campaign.repos
 // 👇 make sure these paths match your tree
 import { OutboundLeadModule } from '../outbound-lead/outbound-lead.module';
 import { WhatsappModule } from 'src/agentModules/whatsapp/whatsapp.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     OutboundLeadModule,  // 👈 provides/export OutboundLeadRepository
-    WhatsappModule,      // 👈 provides/export WhatsappService
+    WhatsappModule,
+    ScheduleModule.forRoot()      // 👈 provides/export WhatsappService
   ],
   controllers: [OutboundCampaignController],
-  providers: [PrismaService, OutboundCampaignRepository, OutboundCampaignService],
+  providers: [ OutboundCampaignRepository, OutboundCampaignService],
   exports: [OutboundCampaignService],
 })
 export class OutboundCampaignModule {}

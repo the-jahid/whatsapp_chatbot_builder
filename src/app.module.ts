@@ -16,6 +16,8 @@ import { AppointmentLeadItemModule } from './agentModules/appointment-lead-item/
 import { OutboundCampaignModule } from './agentModules/outbound/outbound-campaign/outbound-campaign.module';
 import { LeadCustomFieldIntakeModule } from './agentModules/outbound/lead-custom-field-intake/lead-custom-field-intake.module';
 import { OutboundLeadModule } from './agentModules/outbound/outbound-lead/outbound-lead.module';
+import { OutboundCampaignTemplateModule } from './agentModules/outbound/outbound-campaign-template/outbound-campaign-template.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 
 @Module({
@@ -36,7 +38,9 @@ import { OutboundLeadModule } from './agentModules/outbound/outbound-lead/outbou
      AppointmentLeadItemModule,
      OutboundCampaignModule,
      LeadCustomFieldIntakeModule, 
-     OutboundLeadModule
+     OutboundLeadModule,
+     OutboundCampaignTemplateModule,
+     ScheduleModule.forRoot()
     ],
   providers: [AuthGuard]
 })
