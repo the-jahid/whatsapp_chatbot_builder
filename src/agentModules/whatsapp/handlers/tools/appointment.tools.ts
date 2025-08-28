@@ -488,11 +488,11 @@ function generateCandidateSlots(
       while (cursor.plus({ minutes: slotMin }) <= blockEnd) {
         const end = cursor.plus({ minutes: slotMin });
         slots.push({
-          localStart: cursor.toISO(),
-          localEnd: end.toISO(),
-          startUtc: cursor.toUTC().toISO(),
-          endUtc: end.toUTC().toISO(),
-        });
+  localStart: cursor.toISO() ?? '',
+  localEnd: end.toISO() ?? '',
+  startUtc: cursor.toUTC().toISO() ?? '',
+  endUtc: end.toUTC().toISO() ?? '',
+});
         cursor = end;
       }
     }
