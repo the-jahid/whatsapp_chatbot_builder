@@ -12,6 +12,71 @@ datasource db {
  * ENUMS
  * ================================
  */
+enum AIModel {
+  CHATGPT
+  GEMINI
+  CLAUDE
+}
+
+enum OpenAIModel {
+  gpt_3_5_turbo
+  gpt_4
+  gpt_4_1
+  gpt_4_1_mini
+  gpt_4_1_nano
+  gpt_5
+  gpt_5_mini
+  gpt_5_nano
+  gpt_5_thinking
+  gpt_5_thinking_mini
+  gpt_5_thinking_nano
+  gpt_5_thinking_pro
+  gpt_4_turbo
+  gpt_4_turbo_16k
+  gpt_4_turbo_32k
+  gpt_4_vision
+  gpt_4_vision_16k
+  gpt_5_turbo
+  gpt_5_turbo_16k
+  gpt_5_turbo_32k
+  gpt_5_vision
+}
+
+
+
+
+enum GeminiModel {
+  gemini_1_0_nano_1
+  gemini_1_0_nano_2
+  gemini_1_0_pro
+  gemini_1_0_ultra
+  gemini_1_5_pro
+  gemini_1_5_flash
+  gemini_2_0_flash
+  gemini_2_0_flash_lite
+  gemini_2_0_flash_preview_image_generation
+  gemini_2_0_flash_live_001
+  gemini_2_5_pro
+  gemini_2_5_flash
+  gemini_2_5_flash_lite
+}
+
+
+
+enum ClaudeModel {
+  claude_3_haiku
+  claude_3_sonnet
+  claude_3_opus
+  claude_3_5_haiku
+  claude_3_5_sonnet
+  claude_3_5_sonnet_v2
+  claude_3_7_sonnet
+  claude_3_7_sonnet_thinking
+  claude_4_opus
+  claude_4_opus_4_1
+  claude_4_sonnet
+}
+
 
 enum LeadStatus {
   NEW
@@ -125,6 +190,15 @@ enum RecipientProgressStatus {
 }
 
 /**
+ * WhatsApp template lifecycle for management
+ */
+enum TemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+/**
  * ================================
  * MODELS
  * ================================
@@ -146,7 +220,7 @@ model Agent {
   id                    String     @id @default(uuid())
   name                  String
   prompt                String?
-  apiKey                String?    @unique
+  apiKey                String?    @unique  // User-provided API key
   isActive              Boolean    @default(false)
   isLeadsActive         Boolean    @default(false)
   isEmailActive         Boolean    @default(false)
@@ -156,6 +230,14 @@ model Agent {
   memoryType            MemoryType @default(BUFFER)
   isKnowledgebaseActive Boolean    @default(false)
   isBookingActive       Boolean    @default(false)
+  modelType             AIModel    @default(CHATGPT) // New field for model type
+  useOwnApiKey          Boolean    @default(false)  // New field to track if the user is using their own API key
+  userProvidedApiKey    String?    // Optional field for user-provided API key (if useOwnApiKey is true)
+
+  // Enums for selecting the AI model
+  openAIModel           OpenAIModel?   // Enum for OpenAI models
+  geminiModel           GeminiModel?   // Enum for Gemini models
+  claudeModel           ClaudeModel?   // Enum for Claude models
 
   user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   calendarAssignments  AgentCalendarAssignment[]
@@ -169,12 +251,13 @@ model Agent {
   leadItems            LeadItem[]
   weeklyAvailabilities WeeklyAvailability[]
 
-  // Opposite side of 1–1 Whatsapp relation
   whatsapp         Whatsapp?
   OutboundCampaign OutboundCampaign[]
 
   @@index([userId, isActive])
 }
+
+
 
 model Whatsapp {
   id           String   @id @default(uuid())
@@ -208,6 +291,10 @@ model OutboundCampaign {
   // One OutboundCampaign → Many OutboundLead
   outboundLeads OutboundLead[]
 
+  // One OutboundCampaign → Many Templates (new)
+  templates        OutboundCampaignTemplate[]
+  assignedTemplate String?
+
   totalMessages      Int       @default(0)
   leadsCount         Int       @default(0)
   answeredLeadsCount Int       @default(0)
@@ -220,6 +307,32 @@ model OutboundCampaign {
   @@index([agentId, agentEnabled, status, scheduledAt, lastActivityAt])
   @@index([createdAt])
   @@map("outboundCampaigns")
+}
+
+/**
+ * NEW: Per-campaign WhatsApp message templates.
+ * - `name` unique within campaign
+ * - `body` supports placeholders like {{firstName}}; list them in `variables`
+ * - `locale` optional (e.g., "en", "en_US")
+ * - `isDefault` to mark primary template per campaign
+ */
+model OutboundCampaignTemplate {
+  id        String         @id @default(uuid())
+  name      String
+  body      String
+  variables String[]
+  locale    String?
+  status    TemplateStatus @default(DRAFT)
+  isDefault Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  outboundCampaignId String
+  outboundCampaign   OutboundCampaign @relation(fields: [outboundCampaignId], references: [id], onDelete: Cascade)
+
+  @@unique([outboundCampaignId, name]) // unique template name per campaign
+  @@index([outboundCampaignId, isDefault, status])
+  @@map("outbound_campaign_templates")
 }
 
 model leadCustomFieldInatake {
