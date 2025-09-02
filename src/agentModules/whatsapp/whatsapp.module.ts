@@ -3,13 +3,14 @@ import { Module } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { WhatsappController } from './whatsapp.controller';
 import { MessageHandlerService } from './handlers/message-handler.service';
-import { ConversationModule } from '../conversation/conversation.module';
-import { RunAgentService } from './handlers/run-agent.service';
+import { AgentModule } from '../agent/agent.module';
+// import { ConversationModule } from '../conversation/conversation.module'; // no longer needed for this handler
+
 
 @Module({
-  imports: [ConversationModule],
+  imports: [AgentModule], // ConversationModule not required for this path
   controllers: [WhatsappController],
-  providers: [WhatsappService, MessageHandlerService, RunAgentService],
-  exports: [WhatsappService],              // 👈 export so other modules can inject it
+  providers: [WhatsappService, MessageHandlerService],
+  exports: [WhatsappService],
 })
 export class WhatsappModule {}

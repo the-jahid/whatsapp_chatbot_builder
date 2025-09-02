@@ -21,8 +21,10 @@
   },
   "dependencies": {
     "@clerk/clerk-sdk-node": "^4.13.23",
+    "@langchain/anthropic": "^0.3.26",
     "@langchain/community": "^0.3.48",
-    "@langchain/core": "^0.3.62",
+    "@langchain/core": "^0.3.72",
+    "@langchain/google-genai": "^0.2.16",
     "@langchain/openai": "^0.5.18",
     "@nestjs/bull": "^11.0.3",
     "@nestjs/common": "^11.1.3",
